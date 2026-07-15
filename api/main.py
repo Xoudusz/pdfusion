@@ -1,4 +1,4 @@
-import os, subprocess, tempfile
+import os, signal, subprocess, tempfile
 from fastapi import FastAPI, UploadFile, Form
 from fastapi.responses import Response
 
@@ -21,7 +21,7 @@ async def compress(file: UploadFile, dpi: int = Form(150)):
 
     out_path = inp_path + "_out.pdf"
     try:
-        subprocess.run(
+        result = subprocess.run(
             [
                 "gs",
                 "-sDEVICE=pdfwrite",
@@ -30,6 +30,9 @@ async def compress(file: UploadFile, dpi: int = Form(150)):
                 "-dNOPAUSE",
                 "-dQUIET",
                 "-dBATCH",
+                # Cap per-page bitmap RAM to avoid OOM kills on large files
+                "-dMaxBitmap=268435456",
+                "-dBufferSpace=4194304",
                 "-dDownsampleColorImages=true",
                 f"-dColorImageResolution={dpi}",
                 "-dDownsampleGrayImages=true",
@@ -39,16 +42,23 @@ async def compress(file: UploadFile, dpi: int = Form(150)):
                 f"-sOutputFile={out_path}",
                 inp_path,
             ],
-            check=True,
             timeout=600,
         )
+        if result.returncode == -signal.SIGKILL:
+            return Response(
+                content="Out of memory — file too large to process on this server",
+                status_code=507,
+            )
+        if result.returncode != 0:
+            return Response(
+                content=f"Ghostscript failed (exit {result.returncode})",
+                status_code=500,
+            )
         with open(out_path, "rb") as f:
-            result = f.read()
-        return Response(content=result, media_type="application/pdf")
-    except subprocess.CalledProcessError as e:
-        return Response(content=f"Ghostscript error: {e}", status_code=500)
+            output = f.read()
+        return Response(content=output, media_type="application/pdf")
     except subprocess.TimeoutExpired:
-        return Response(content="Processing timed out", status_code=500)
+        return Response(content="Processing timed out (>10 min)", status_code=500)
     finally:
         os.unlink(inp_path)
         if os.path.exists(out_path):
