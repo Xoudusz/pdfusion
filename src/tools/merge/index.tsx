@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { PDFDocument } from "pdf-lib";
-import { GripVertical, X, FileText } from "lucide-react";
+import { GripVertical, X, FileText, ChevronUp, ChevronDown } from "lucide-react";
 import FileDropzone from "../../components/FileDropzone";
 import DownloadButton from "../../components/DownloadButton";
 import { saveFile } from "../../lib/tauri";
@@ -43,6 +43,16 @@ export default function MergeTool() {
   };
 
   const removeItem = (id: number) => setItems((prev) => prev.filter((i) => i.id !== id));
+
+  const moveItem = (idx: number, dir: -1 | 1) => {
+    setItems((prev) => {
+      const next = [...prev];
+      const target = idx + dir;
+      if (target < 0 || target >= next.length) return prev;
+      [next[idx], next[target]] = [next[target], next[idx]];
+      return next;
+    });
+  };
 
   const onDragStart = (idx: number) => { dragIndex.current = idx; };
 
@@ -113,11 +123,10 @@ export default function MergeTool() {
                 border: "1px solid var(--border)",
                 borderRadius: 8,
                 padding: "0.5rem 0.75rem",
-                cursor: "grab",
                 userSelect: "none",
               }}
             >
-              <GripVertical size={16} style={{ color: "var(--text-muted)", flexShrink: 0 }} />
+              <GripVertical size={16} style={{ color: "var(--border)", flexShrink: 0, cursor: "grab" }} />
 
               {item.thumb ? (
                 <img
@@ -151,15 +160,7 @@ export default function MergeTool() {
               )}
 
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div
-                  style={{
-                    fontSize: "0.875rem",
-                    fontWeight: 500,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
+                <div style={{ fontSize: "0.875rem", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {item.file.name}
                 </div>
                 {item.pageCount > 0 && (
@@ -169,22 +170,26 @@ export default function MergeTool() {
                 )}
               </div>
 
-              <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", flexShrink: 0 }}>
-                {idx + 1}
-              </span>
+              <div style={{ display: "flex", flexDirection: "column", gap: 2, flexShrink: 0 }}>
+                <button
+                  onClick={() => moveItem(idx, -1)}
+                  disabled={idx === 0}
+                  style={{ background: "none", border: "none", cursor: idx === 0 ? "default" : "pointer", color: idx === 0 ? "#2a2a2a" : "var(--text-muted)", padding: 1, display: "flex" }}
+                >
+                  <ChevronUp size={14} />
+                </button>
+                <button
+                  onClick={() => moveItem(idx, 1)}
+                  disabled={idx === items.length - 1}
+                  style={{ background: "none", border: "none", cursor: idx === items.length - 1 ? "default" : "pointer", color: idx === items.length - 1 ? "#2a2a2a" : "var(--text-muted)", padding: 1, display: "flex" }}
+                >
+                  <ChevronDown size={14} />
+                </button>
+              </div>
 
               <button
                 onClick={() => removeItem(item.id)}
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: "var(--text-muted)",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  padding: 2,
-                  flexShrink: 0,
-                }}
+                style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", display: "flex", alignItems: "center", padding: 2, flexShrink: 0 }}
               >
                 <X size={15} />
               </button>
