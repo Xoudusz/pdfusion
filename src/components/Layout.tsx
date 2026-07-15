@@ -17,9 +17,7 @@ export default function Layout({ children, onBack, title }: LayoutProps) {
           height: 56,
         }}
       >
-        <div
-          className="flex items-center gap-2 h-full px-6 max-w-5xl mx-auto"
-        >
+        <div className="flex items-center gap-2 h-full px-4 md:px-6 max-w-5xl mx-auto">
           {onBack && (
             <button
               onClick={onBack}
@@ -54,7 +52,7 @@ export default function Layout({ children, onBack, title }: LayoutProps) {
           </span>
         </div>
       </header>
-      <main className="flex-1 px-6 py-10 max-w-5xl mx-auto w-full">
+      <main className="flex-1 px-4 md:px-6 py-8 md:py-10 max-w-5xl mx-auto w-full">
         {children}
       </main>
     </div>
