@@ -17,6 +17,7 @@ RUN python3 -m venv /opt/venv && \
 COPY --from=builder /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY api/ /app/api/
+COPY VERSION /app/VERSION
 COPY supervisord.conf /etc/supervisord.conf
 
 EXPOSE 80
