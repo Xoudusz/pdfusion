@@ -3,6 +3,8 @@ services:
     image: ghcr.io/xoudusz/pdfusion:latest
     container_name: pdfusion
     restart: unless-stopped
+    ports:
+      - "8082:80"
     network_mode: nginx_proxy_default
     environment:
       - VIRTUAL_HOST=pdf.hyvitech.org
