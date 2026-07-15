@@ -107,6 +107,12 @@ export default function CompressTool() {
       {!file ? (
         <FileDropzone accept=".pdf" label="Select a PDF file" onFiles={handleFiles} />
       ) : (
+        <>
+        {file.size > 80 * 1024 * 1024 && (
+          <div style={{ background: "#1a1200", border: "1px solid #7a5c00", borderRadius: 8, padding: "0.6rem 0.85rem", fontSize: "0.8rem", color: "#f0b429" }}>
+            Large file ({formatBytes(file.size)}) — server limit is 100 MB. Consider splitting first if compression fails.
+          </div>
+        )}
         <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, padding: "0.65rem 1rem", display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "0.875rem" }}>
           <span>
             <strong>{file.name}</strong>
@@ -117,6 +123,7 @@ export default function CompressTool() {
             style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: "0 0.25rem", fontSize: "1rem" }}
           >✕</button>
         </div>
+        </>
       )}
 
       {file && !result && (
