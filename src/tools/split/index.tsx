@@ -43,12 +43,14 @@ export default function SplitTool() {
   const [outputMode, setOutputMode] = useState<OutputMode>("separate");
   const [compress, setCompress] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [reading, setReading] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const handleFiles = async (files: File[]) => {
     const f = files[0];
     setError(null);
+    setReading(true);
     try {
       const bytes = await f.arrayBuffer();
       const doc = await PDFDocument.load(bytes);
@@ -57,6 +59,8 @@ export default function SplitTool() {
       setRanges([{ id: Date.now(), from: "", to: "" }]);
     } catch {
       setError("Could not read PDF.");
+    } finally {
+      setReading(false);
     }
   };
 
@@ -142,9 +146,15 @@ export default function SplitTool() {
         </p>
       </div>
 
-      {!file ? (
+      {reading && (
+        <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, padding: "0.65rem 1rem", fontSize: "0.875rem", color: "var(--text-muted)" }}>
+          Reading PDF…
+        </div>
+      )}
+
+      {!file && !reading ? (
         <FileDropzone accept=".pdf" label="Select a PDF file" onFiles={handleFiles} />
-      ) : (
+      ) : !reading && file && (
         <div
           style={{
             background: "var(--bg-card)",

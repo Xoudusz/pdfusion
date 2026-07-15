@@ -26,6 +26,7 @@ async function generateThumb(file: File): Promise<{ pageCount: number; thumb: st
 
 export default function MergeTool() {
   const [items, setItems] = useState<FileItem[]>([]);
+  const [reading, setReading] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const dragIndex = useRef<number | null>(null);
@@ -33,11 +34,13 @@ export default function MergeTool() {
 
   const handleFiles = async (files: File[]) => {
     setError(null);
+    setReading((n) => n + files.length);
     const newItems: FileItem[] = [];
     for (const file of files) {
       const id = nextId.current++;
       const { pageCount, thumb } = await generateThumb(file);
       newItems.push({ id, file, pageCount, thumb });
+      setReading((n) => n - 1);
     }
     setItems((prev) => [...prev, ...newItems]);
   };
@@ -102,11 +105,30 @@ export default function MergeTool() {
 
       <FileDropzone accept=".pdf" multiple label="Add PDF files" onFiles={handleFiles} />
 
-      {items.length > 0 && (
+      {(items.length > 0 || reading > 0) && (
         <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
           <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "0.1rem" }}>
-            {items.length} file{items.length !== 1 ? "s" : ""} — drag to reorder
+            {items.length} file{items.length !== 1 ? "s" : ""}{reading > 0 ? ` — reading ${reading} more…` : " — drag to reorder"}
           </div>
+
+          {Array.from({ length: reading }).map((_, i) => (
+            <div
+              key={`skeleton-${i}`}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "0.75rem",
+                background: "var(--bg-card)",
+                border: "1px solid var(--border)",
+                borderRadius: 8,
+                padding: "0.5rem 0.75rem",
+                opacity: 0.5,
+              }}
+            >
+              <div style={{ width: 32, height: 42, borderRadius: 3, background: "var(--border)", flexShrink: 0 }} />
+              <div style={{ fontSize: "0.875rem", color: "var(--text-muted)" }}>Reading PDF…</div>
+            </div>
+          ))}
 
           {items.map((item, idx) => (
             <div
