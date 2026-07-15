@@ -1,108 +1,114 @@
 import { useState } from "react";
 import { PDFDocument } from "pdf-lib";
 import JSZip from "jszip";
+import { Plus, X } from "lucide-react";
 import FileDropzone from "../../components/FileDropzone";
 import DownloadButton from "../../components/DownloadButton";
 import { saveFile } from "../../lib/tauri";
 
-type Mode = "extract" | "range";
-
-function parsePageNumbers(input: string, total: number): number[] | null {
-  const nums: number[] = [];
-  const parts = input.split(",").map((s) => s.trim()).filter(Boolean);
-  for (const part of parts) {
-    const n = parseInt(part, 10);
-    if (isNaN(n) || n < 1 || n > total) return null;
-    nums.push(n - 1); // convert to 0-based
-  }
-  return nums.length > 0 ? nums : null;
+interface Range {
+  id: number;
+  from: string;
+  to: string;
 }
 
-function parseRanges(input: string, total: number): number[][] | null {
-  const ranges: number[][] = [];
-  const parts = input.split(",").map((s) => s.trim()).filter(Boolean);
-  for (const part of parts) {
-    const match = part.match(/^(\d+)-(\d+)$/);
-    if (!match) return null;
-    const start = parseInt(match[1], 10);
-    const end = parseInt(match[2], 10);
-    if (isNaN(start) || isNaN(end) || start < 1 || end > total || start > end) return null;
-    const pages: number[] = [];
-    for (let i = start; i <= end; i++) pages.push(i - 1); // 0-based
-    ranges.push(pages);
-  }
-  return ranges.length > 0 ? ranges : null;
+type OutputMode = "separate" | "single";
+
+function parseRange(from: string, to: string, total: number): number[] | null {
+  const f = parseInt(from, 10);
+  const t = parseInt(to, 10);
+  if (isNaN(f) || isNaN(t) || f < 1 || t > total || f > t) return null;
+  const pages: number[] = [];
+  for (let i = f; i <= t; i++) pages.push(i - 1);
+  return pages;
 }
+
+const inputStyle: React.CSSProperties = {
+  background: "var(--bg-card)",
+  border: "1px solid var(--border)",
+  color: "var(--text)",
+  borderRadius: 6,
+  padding: "0.4rem 0.6rem",
+  fontSize: "0.9rem",
+  width: 64,
+  outline: "none",
+  textAlign: "center",
+};
 
 export default function SplitTool() {
   const [file, setFile] = useState<File | null>(null);
   const [pageCount, setPageCount] = useState<number | null>(null);
-  const [mode, setMode] = useState<Mode>("extract");
-  const [input, setInput] = useState("");
+  const [ranges, setRanges] = useState<Range[]>([{ id: 1, from: "", to: "" }]);
+  const [outputMode, setOutputMode] = useState<OutputMode>("separate");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleFiles = async (files: File[]) => {
     const f = files[0];
-    setFile(f);
     setError(null);
-    setInput("");
     try {
       const bytes = await f.arrayBuffer();
       const doc = await PDFDocument.load(bytes);
+      setFile(f);
       setPageCount(doc.getPageCount());
+      setRanges([{ id: Date.now(), from: "", to: "" }]);
     } catch {
-      setError("Could not read PDF. Make sure the file is a valid PDF.");
-      setFile(null);
-      setPageCount(null);
+      setError("Could not read PDF.");
     }
+  };
+
+  const updateRange = (id: number, field: "from" | "to", val: string) => {
+    setRanges((prev) => prev.map((r) => r.id === id ? { ...r, [field]: val } : r));
+    setError(null);
+  };
+
+  const addRange = () => {
+    setRanges((prev) => [...prev, { id: Date.now(), from: "", to: "" }]);
+  };
+
+  const removeRange = (id: number) => {
+    setRanges((prev) => prev.length > 1 ? prev.filter((r) => r.id !== id) : prev);
   };
 
   const handleProcess = async () => {
     if (!file || pageCount === null) return;
     setLoading(true);
     setError(null);
+
     try {
       const bytes = await file.arrayBuffer();
       const srcDoc = await PDFDocument.load(bytes);
+      const parsed: number[][] = [];
 
-      if (mode === "extract") {
-        const pages = parsePageNumbers(input, pageCount);
+      for (const r of ranges) {
+        const pages = parseRange(r.from, r.to, pageCount);
         if (!pages) {
-          setError(`Invalid page numbers. Enter comma-separated numbers between 1 and ${pageCount}.`);
+          setError(`Invalid range "${r.from}-${r.to}". Pages must be between 1 and ${pageCount}, from ≤ to.`);
           setLoading(false);
           return;
         }
+        parsed.push(pages);
+      }
+
+      if (outputMode === "single" || parsed.length === 1) {
         const out = await PDFDocument.create();
-        const copied = await out.copyPages(srcDoc, pages);
-        copied.forEach((p) => out.addPage(p));
-        const data = await out.save();
-        await saveFile(data, "extracted.pdf");
-      } else {
-        const ranges = parseRanges(input, pageCount);
-        if (!ranges) {
-          setError(`Invalid ranges. Use format like "1-3,4-6" with pages between 1 and ${pageCount}.`);
-          setLoading(false);
-          return;
+        for (const pages of parsed) {
+          const copied = await out.copyPages(srcDoc, pages);
+          copied.forEach((p) => out.addPage(p));
         }
-        if (ranges.length === 1) {
+        const data = await out.save();
+        await saveFile(data, "split.pdf");
+      } else {
+        const zip = new JSZip();
+        for (let i = 0; i < parsed.length; i++) {
           const out = await PDFDocument.create();
-          const copied = await out.copyPages(srcDoc, ranges[0]);
+          const copied = await out.copyPages(srcDoc, parsed[i]);
           copied.forEach((p) => out.addPage(p));
           const data = await out.save();
-          await saveFile(data, "split-1.pdf");
-        } else {
-          const zip = new JSZip();
-          for (let i = 0; i < ranges.length; i++) {
-            const out = await PDFDocument.create();
-            const copied = await out.copyPages(srcDoc, ranges[i]);
-            copied.forEach((p) => out.addPage(p));
-            const data = await out.save();
-            zip.file(`split-${i + 1}.pdf`, data);
-          }
-          const zipData = await zip.generateAsync({ type: "uint8array" });
-          await saveFile(zipData, "split.zip");
+          zip.file(`split-${i + 1}.pdf`, data);
         }
+        const zipData = await zip.generateAsync({ type: "uint8array" });
+        await saveFile(zipData, "split.zip");
       }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to split PDF.");
@@ -111,23 +117,14 @@ export default function SplitTool() {
     }
   };
 
-  const inputStyle: React.CSSProperties = {
-    background: "var(--bg-card)",
-    border: "1px solid var(--border)",
-    color: "var(--text)",
-    borderRadius: "var(--radius)",
-    padding: "0.5rem 0.75rem",
-    fontSize: "0.9rem",
-    width: "100%",
-    outline: "none",
-  };
+  const canProcess = file && pageCount !== null && ranges.every((r) => r.from && r.to);
 
   return (
-    <div style={{ maxWidth: 640, margin: "0 auto", display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+    <div style={{ maxWidth: 580, margin: "0 auto", display: "flex", flexDirection: "column", gap: "1.5rem" }}>
       <div>
         <h2 style={{ fontWeight: 700, fontSize: "1.25rem", marginBottom: "0.25rem" }}>Split PDF</h2>
-        <p style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>
-          Extract specific pages or split a PDF into multiple documents by page range.
+        <p style={{ color: "var(--text-muted)", fontSize: "0.875rem" }}>
+          Define one or more page ranges to extract.
         </p>
       </div>
 
@@ -138,8 +135,8 @@ export default function SplitTool() {
           style={{
             background: "var(--bg-card)",
             border: "1px solid var(--border)",
-            borderRadius: "var(--radius)",
-            padding: "0.75rem 1rem",
+            borderRadius: 8,
+            padding: "0.65rem 1rem",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
@@ -148,23 +145,13 @@ export default function SplitTool() {
         >
           <span>
             <strong>{file.name}</strong>
-            {pageCount !== null && (
-              <span style={{ color: "var(--text-muted)", marginLeft: "0.5rem" }}>
-                — {pageCount} page{pageCount !== 1 ? "s" : ""}
-              </span>
-            )}
+            <span style={{ color: "var(--text-muted)", marginLeft: "0.5rem" }}>
+              — {pageCount} page{pageCount !== 1 ? "s" : ""}
+            </span>
           </span>
           <button
-            onClick={() => { setFile(null); setPageCount(null); setInput(""); setError(null); }}
-            style={{
-              background: "none",
-              border: "none",
-              color: "var(--text-muted)",
-              cursor: "pointer",
-              fontSize: "1rem",
-              padding: "0 0.25rem",
-            }}
-            title="Remove file"
+            onClick={() => { setFile(null); setPageCount(null); setRanges([{ id: 1, from: "", to: "" }]); setError(null); }}
+            style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: "0 0.25rem", fontSize: "1rem" }}
           >
             ✕
           </button>
@@ -172,68 +159,136 @@ export default function SplitTool() {
       )}
 
       {file && pageCount !== null && (
-        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-          <div style={{ display: "flex", gap: "0.75rem" }}>
-            {(["extract", "range"] as Mode[]).map((m) => (
-              <button
-                key={m}
-                onClick={() => { setMode(m); setInput(""); setError(null); }}
+        <>
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+            <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "0.25rem" }}>
+              Page ranges
+            </div>
+
+            {ranges.map((r, idx) => (
+              <div
+                key={r.id}
                 style={{
-                  flex: 1,
-                  padding: "0.5rem",
-                  background: mode === m ? "var(--accent)" : "var(--bg-card)",
-                  border: `1px solid ${mode === m ? "var(--accent)" : "var(--border)"}`,
-                  color: mode === m ? "#fff" : "var(--text-muted)",
-                  borderRadius: "var(--radius)",
-                  fontWeight: mode === m ? 600 : 400,
-                  cursor: "pointer",
-                  fontSize: "0.875rem",
-                  transition: "all 0.15s",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.75rem",
+                  background: "var(--bg-card)",
+                  border: "1px solid var(--border)",
+                  borderRadius: 8,
+                  padding: "0.65rem 0.875rem",
                 }}
               >
-                {m === "extract" ? "Extract pages" : "Split by range"}
-              </button>
-            ))}
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-            <label style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
-              {mode === "extract"
-                ? `Page numbers (e.g. "1,3,5") — pages 1 to ${pageCount}`
-                : `Ranges (e.g. "1-3,4-6") — pages 1 to ${pageCount}`}
-            </label>
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => { setInput(e.target.value); setError(null); }}
-              placeholder={mode === "extract" ? "1,3,5" : "1-3,4-6"}
-              style={inputStyle}
-            />
-            {mode === "range" && input && !error && (
-              <div style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>
-                {(() => {
-                  const ranges = parseRanges(input, pageCount);
-                  if (!ranges) return null;
-                  return ranges.length > 1
-                    ? `${ranges.length} files will be saved as split.zip`
-                    : "1 file will be saved as split-1.pdf";
-                })()}
+                <span style={{ fontSize: "0.8rem", color: "var(--text-muted)", minWidth: 56 }}>
+                  Range {idx + 1}
+                </span>
+                <input
+                  type="number"
+                  min={1}
+                  max={pageCount}
+                  value={r.from}
+                  onChange={(e) => updateRange(r.id, "from", e.target.value)}
+                  placeholder="From"
+                  style={inputStyle}
+                />
+                <span style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>–</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={pageCount}
+                  value={r.to}
+                  onChange={(e) => updateRange(r.id, "to", e.target.value)}
+                  placeholder="To"
+                  style={inputStyle}
+                />
+                {r.from && r.to && parseRange(r.from, r.to, pageCount) && (
+                  <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
+                    {parseRange(r.from, r.to, pageCount)!.length}p
+                  </span>
+                )}
+                <button
+                  onClick={() => removeRange(r.id)}
+                  disabled={ranges.length === 1}
+                  style={{
+                    marginLeft: "auto",
+                    background: "none",
+                    border: "none",
+                    color: ranges.length === 1 ? "#333" : "var(--text-muted)",
+                    cursor: ranges.length === 1 ? "default" : "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    padding: 2,
+                  }}
+                >
+                  <X size={15} />
+                </button>
               </div>
-            )}
+            ))}
+
+            <button
+              onClick={addRange}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "0.4rem",
+                background: "none",
+                border: "1px dashed var(--border)",
+                color: "var(--text-muted)",
+                borderRadius: 8,
+                padding: "0.55rem 0.875rem",
+                fontSize: "0.8rem",
+                cursor: "pointer",
+                transition: "border-color 0.15s, color 0.15s",
+              }}
+              onMouseEnter={(e) => {
+                const el = e.currentTarget as HTMLButtonElement;
+                el.style.borderColor = "var(--accent)";
+                el.style.color = "var(--accent)";
+              }}
+              onMouseLeave={(e) => {
+                const el = e.currentTarget as HTMLButtonElement;
+                el.style.borderColor = "var(--border)";
+                el.style.color = "var(--text-muted)";
+              }}
+            >
+              <Plus size={14} /> Add range
+            </button>
           </div>
-        </div>
+
+          {ranges.length > 1 && (
+            <div style={{ display: "flex", gap: "0.5rem" }}>
+              {(["separate", "single"] as OutputMode[]).map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setOutputMode(m)}
+                  style={{
+                    flex: 1,
+                    padding: "0.5rem",
+                    background: outputMode === m ? "var(--accent)" : "var(--bg-card)",
+                    border: `1px solid ${outputMode === m ? "var(--accent)" : "var(--border)"}`,
+                    color: outputMode === m ? "#fff" : "var(--text-muted)",
+                    borderRadius: 8,
+                    fontWeight: outputMode === m ? 600 : 400,
+                    cursor: "pointer",
+                    fontSize: "0.8rem",
+                    transition: "all 0.15s",
+                  }}
+                >
+                  {m === "separate" ? "Separate PDFs (.zip)" : "One PDF"}
+                </button>
+              ))}
+            </div>
+          )}
+        </>
       )}
 
-      {error && (
-        <div style={{ color: "#ef4444", fontSize: "0.875rem" }}>{error}</div>
-      )}
+      {error && <div style={{ color: "#ef4444", fontSize: "0.875rem" }}>{error}</div>}
 
       {file && pageCount !== null && (
         <DownloadButton
           onClick={handleProcess}
           loading={loading}
-          label={mode === "extract" ? "Extract & Save" : "Split & Save"}
-          disabled={!input.trim()}
+          label={`Split & Save${ranges.length > 1 && outputMode === "separate" ? " (.zip)" : ""}`}
+          disabled={!canProcess}
         />
       )}
     </div>
