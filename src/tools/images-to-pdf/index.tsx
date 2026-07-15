@@ -2,11 +2,12 @@ import { useState } from "react";
 import { PDFDocument } from "pdf-lib";
 import FileDropzone from "../../components/FileDropzone";
 import DownloadButton from "../../components/DownloadButton";
-import { saveFile } from "../../lib/tauri";
+import ResultActions from "../../components/ResultActions";
 
 export default function ImagesToPdfTool() {
   const [images, setImages] = useState<File[]>([]);
   const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<Uint8Array | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const handleFiles = (incoming: File[]) => {
@@ -45,7 +46,7 @@ export default function ImagesToPdfTool() {
       }
 
       const output = await doc.save();
-      await saveFile(output, "images.pdf");
+      setResult(output);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to create PDF from images.");
     } finally {
@@ -122,30 +123,22 @@ export default function ImagesToPdfTool() {
         <div style={{ color: "#ef4444", fontSize: "0.875rem" }}>{error}</div>
       )}
 
-      <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
-        <DownloadButton
-          onClick={handleConvert}
-          loading={loading}
-          label="Convert & Save"
-          disabled={images.length === 0}
+      {!result ? (
+        <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
+          <DownloadButton onClick={handleConvert} loading={loading} label="Convert & Save" disabled={images.length === 0} />
+          {images.length > 0 && (
+            <button onClick={() => { setImages([]); setError(null); setResult(null); }} style={{ background: "none", border: "1px solid var(--border)", color: "var(--text-muted)", borderRadius: 8, padding: "0.65rem 1rem", fontSize: "0.875rem", cursor: "pointer" }}>
+              Clear all
+            </button>
+          )}
+        </div>
+      ) : (
+        <ResultActions
+          data={result}
+          filename="images.pdf"
+          nextTools={[{ path: "/compress", label: "Compress" }, { path: "/split", label: "Split" }]}
         />
-        {images.length > 0 && (
-          <button
-            onClick={() => { setImages([]); setError(null); }}
-            style={{
-              background: "none",
-              border: "1px solid var(--border)",
-              color: "var(--text-muted)",
-              borderRadius: "var(--radius)",
-              padding: "0.7rem 1rem",
-              fontSize: "0.875rem",
-              cursor: "pointer",
-            }}
-          >
-            Clear all
-          </button>
-        )}
-      </div>
+      )}
     </div>
   );
 }

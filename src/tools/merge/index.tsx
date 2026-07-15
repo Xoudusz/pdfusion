@@ -1,10 +1,11 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { PDFDocument } from "pdf-lib";
 import { GripVertical, X, FileText, ChevronUp, ChevronDown } from "lucide-react";
 import FileDropzone from "../../components/FileDropzone";
 import DownloadButton from "../../components/DownloadButton";
-import { saveFile } from "../../lib/tauri";
+import ResultActions from "../../components/ResultActions";
 import { loadPdf, renderPageToCanvas } from "../../lib/pdf";
+import { consumePendingFile } from "../../lib/fileStore";
 
 interface FileItem {
   id: number;
@@ -28,9 +29,15 @@ export default function MergeTool() {
   const [items, setItems] = useState<FileItem[]>([]);
   const [reading, setReading] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<Uint8Array | null>(null);
   const [error, setError] = useState<string | null>(null);
   const dragIndex = useRef<number | null>(null);
   const nextId = useRef(1);
+
+  useEffect(() => {
+    const f = consumePendingFile();
+    if (f) handleFiles([f]);
+  }, []);
 
   const handleFiles = async (files: File[]) => {
     setError(null);
@@ -77,6 +84,7 @@ export default function MergeTool() {
     if (items.length < 2) { setError("Need at least 2 PDF files to merge."); return; }
     setLoading(true);
     setError(null);
+    setResult(null);
     try {
       const merged = await PDFDocument.create();
       for (const item of items) {
@@ -86,7 +94,7 @@ export default function MergeTool() {
         pages.forEach((p) => merged.addPage(p));
       }
       const output = await merged.save();
-      await saveFile(output, "merged.pdf");
+      setResult(output);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to merge PDFs.");
     } finally {
@@ -222,25 +230,25 @@ export default function MergeTool() {
 
       {error && <div style={{ color: "#ef4444", fontSize: "0.875rem" }}>{error}</div>}
 
-      <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
-        <DownloadButton onClick={handleMerge} loading={loading} label="Merge & Save" disabled={items.length < 2} />
-        {items.length > 0 && (
-          <button
-            onClick={() => { setItems([]); setError(null); }}
-            style={{
-              background: "none",
-              border: "1px solid var(--border)",
-              color: "var(--text-muted)",
-              borderRadius: 8,
-              padding: "0.65rem 1rem",
-              fontSize: "0.875rem",
-              cursor: "pointer",
-            }}
-          >
-            Clear all
-          </button>
-        )}
-      </div>
+      {!result ? (
+        <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
+          <DownloadButton onClick={handleMerge} loading={loading} label="Merge & Save" disabled={items.length < 2} />
+          {items.length > 0 && (
+            <button
+              onClick={() => { setItems([]); setError(null); setResult(null); }}
+              style={{ background: "none", border: "1px solid var(--border)", color: "var(--text-muted)", borderRadius: 8, padding: "0.65rem 1rem", fontSize: "0.875rem", cursor: "pointer" }}
+            >
+              Clear all
+            </button>
+          )}
+        </div>
+      ) : (
+        <ResultActions
+          data={result}
+          filename="merged.pdf"
+          nextTools={[{ path: "/compress", label: "Compress" }, { path: "/split", label: "Split" }]}
+        />
+      )}
     </div>
   );
 }

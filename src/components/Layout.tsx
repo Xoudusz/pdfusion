@@ -1,12 +1,15 @@
 import { ChevronLeft } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 interface LayoutProps {
   children: React.ReactNode;
-  onBack?: () => void;
   title?: string;
 }
 
-export default function Layout({ children, onBack, title }: LayoutProps) {
+export default function Layout({ children, title }: LayoutProps) {
+  const navigate = useNavigate();
+  const isHome = !title;
+
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
       <header
@@ -28,9 +31,9 @@ export default function Layout({ children, onBack, title }: LayoutProps) {
             marginInline: "auto",
           }}
         >
-          {onBack && (
+          {!isHome && (
             <button
-              onClick={onBack}
+              onClick={() => navigate("/")}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -42,12 +45,8 @@ export default function Layout({ children, onBack, title }: LayoutProps) {
                 color: "var(--text-muted)",
                 borderRadius: 6,
               }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.color = "var(--text)";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.color = "var(--text-muted)";
-              }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "var(--text)"; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "var(--text-muted)"; }}
             >
               <ChevronLeft size={20} />
             </button>
@@ -61,9 +60,11 @@ export default function Layout({ children, onBack, title }: LayoutProps) {
               WebkitBackgroundClip: "text",
               WebkitTextFillColor: "transparent",
               backgroundClip: "text",
+              cursor: isHome ? "default" : "pointer",
             }}
+            onClick={() => !isHome && navigate("/")}
           >
-            {title ?? "PDFusion"}
+            {title ? `PDFusion · ${title}` : "PDFusion"}
           </span>
         </div>
       </header>

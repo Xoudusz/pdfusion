@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PDFDocument, degrees } from "pdf-lib";
 import FileDropzone from "../../components/FileDropzone";
 import DownloadButton from "../../components/DownloadButton";
-import { saveFile } from "../../lib/tauri";
+import ResultActions from "../../components/ResultActions";
+import { consumePendingFile } from "../../lib/fileStore";
 
 type RotateTarget = "all" | "specific";
 
@@ -30,7 +31,13 @@ export default function RotateTool() {
   const [pageInput, setPageInput] = useState("");
   const [rotation, setRotation] = useState(90);
   const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<Uint8Array | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const f = consumePendingFile();
+    if (f) handleFiles([f]);
+  }, []);
 
   const handleFiles = async (files: File[]) => {
     const f = files[0];
@@ -77,7 +84,7 @@ export default function RotateTool() {
       }
 
       const output = await doc.save();
-      await saveFile(output, "rotated.pdf");
+      setResult(output);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to rotate PDF.");
     } finally {
@@ -208,12 +215,15 @@ export default function RotateTool() {
         <div style={{ color: "#ef4444", fontSize: "0.875rem" }}>{error}</div>
       )}
 
-      {file && pageCount !== null && (
-        <DownloadButton
-          onClick={handleRotate}
-          loading={loading}
-          label="Rotate & Save"
-          disabled={!canProcess}
+      {file && pageCount !== null && !result && (
+        <DownloadButton onClick={handleRotate} loading={loading} label="Rotate & Save" disabled={!canProcess} />
+      )}
+
+      {result && (
+        <ResultActions
+          data={result}
+          filename={file!.name.replace(/\.pdf$/i, "-rotated.pdf")}
+          nextTools={[{ path: "/compress", label: "Compress" }, { path: "/merge", label: "Merge" }]}
         />
       )}
     </div>
