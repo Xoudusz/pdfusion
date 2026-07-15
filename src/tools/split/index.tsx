@@ -5,6 +5,7 @@ import { Plus, X } from "lucide-react";
 import FileDropzone from "../../components/FileDropzone";
 import DownloadButton from "../../components/DownloadButton";
 import { saveFile } from "../../lib/tauri";
+import { compressPdfBytes } from "../../lib/pdf";
 
 interface Range {
   id: number;
@@ -40,7 +41,9 @@ export default function SplitTool() {
   const [pageCount, setPageCount] = useState<number | null>(null);
   const [ranges, setRanges] = useState<Range[]>([{ id: 1, from: "", to: "" }]);
   const [outputMode, setOutputMode] = useState<OutputMode>("separate");
+  const [compress, setCompress] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const handleFiles = async (files: File[]) => {
@@ -74,6 +77,7 @@ export default function SplitTool() {
     if (!file || pageCount === null) return;
     setLoading(true);
     setError(null);
+    setProgress(null);
 
     try {
       const bytes = await file.arrayBuffer();
@@ -90,30 +94,40 @@ export default function SplitTool() {
         parsed.push(pages);
       }
 
-      if (outputMode === "single" || parsed.length === 1) {
+      const buildPdf = async (pages: number[]): Promise<Uint8Array> => {
         const out = await PDFDocument.create();
-        for (const pages of parsed) {
-          const copied = await out.copyPages(srcDoc, pages);
-          copied.forEach((p) => out.addPage(p));
-        }
-        const data = await out.save();
+        const copied = await out.copyPages(srcDoc, pages);
+        copied.forEach((p) => out.addPage(p));
+        const raw = await out.save({ useObjectStreams: true });
+        if (!compress) return raw;
+        return compressPdfBytes(raw.buffer as ArrayBuffer, 0.7, (page, total) => {
+          setProgress(`Compressing page ${page}/${total}…`);
+        });
+      };
+
+      if (outputMode === "single" || parsed.length === 1) {
+        setProgress(compress ? "Building PDF…" : null);
+        const allPages = parsed.flat();
+        const data = await buildPdf(allPages);
+        setProgress(null);
         await saveFile(data, "split.pdf");
       } else {
         const zip = new JSZip();
         for (let i = 0; i < parsed.length; i++) {
-          const out = await PDFDocument.create();
-          const copied = await out.copyPages(srcDoc, parsed[i]);
-          copied.forEach((p) => out.addPage(p));
-          const data = await out.save();
+          setProgress(`Processing range ${i + 1}/${parsed.length}…`);
+          const data = await buildPdf(parsed[i]);
           zip.file(`split-${i + 1}.pdf`, data);
         }
+        setProgress("Zipping…");
         const zipData = await zip.generateAsync({ type: "uint8array" });
+        setProgress(null);
         await saveFile(zipData, "split.zip");
       }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to split PDF.");
     } finally {
       setLoading(false);
+      setProgress(null);
     }
   };
 
@@ -281,6 +295,29 @@ export default function SplitTool() {
         </>
       )}
 
+      {file && pageCount !== null && (
+        <label
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "0.6rem",
+            fontSize: "0.875rem",
+            cursor: "pointer",
+            color: "var(--text-muted)",
+            userSelect: "none",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={compress}
+            onChange={(e) => setCompress(e.target.checked)}
+            style={{ accentColor: "var(--accent)", width: 15, height: 15, cursor: "pointer" }}
+          />
+          Compress output (lossy — re-renders pages as JPEG)
+        </label>
+      )}
+
+      {progress && <div style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>{progress}</div>}
       {error && <div style={{ color: "#ef4444", fontSize: "0.875rem" }}>{error}</div>}
 
       {file && pageCount !== null && (
