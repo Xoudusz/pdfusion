@@ -4,15 +4,15 @@ from fastapi.responses import Response
 
 app = FastAPI()
 
-PRESETS = {
-    "small":    "/screen",
-    "balanced": "/ebook",
-    "quality":  "/printer",
-}
-
 @app.post("/api/compress")
-async def compress(file: UploadFile, preset: str = Form("balanced")):
-    gs_preset = PRESETS.get(preset, "/ebook")
+async def compress(file: UploadFile, dpi: int = Form(150)):
+    if dpi <= 72:
+        gs_preset = "/screen"
+    elif dpi <= 150:
+        gs_preset = "/ebook"
+    else:
+        gs_preset = "/printer"
+
     data = await file.read()
 
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as inp:
@@ -30,11 +30,17 @@ async def compress(file: UploadFile, preset: str = Form("balanced")):
                 "-dNOPAUSE",
                 "-dQUIET",
                 "-dBATCH",
+                "-dDownsampleColorImages=true",
+                f"-dColorImageResolution={dpi}",
+                "-dDownsampleGrayImages=true",
+                f"-dGrayImageResolution={dpi}",
+                "-dDownsampleMonoImages=true",
+                f"-dMonoImageResolution={min(dpi, 300)}",
                 f"-sOutputFile={out_path}",
                 inp_path,
             ],
             check=True,
-            timeout=300,
+            timeout=600,
         )
         with open(out_path, "rb") as f:
             result = f.read()
