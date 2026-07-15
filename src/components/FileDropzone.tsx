@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { CloudUpload } from "lucide-react";
 import { openFiles, isTauri } from "../lib/tauri";
 
 interface Props {
@@ -31,24 +32,25 @@ export default function FileDropzone({ accept, multiple, label, onFiles }: Props
       onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
       onDragLeave={() => setDragging(false)}
       onDrop={isTauri ? undefined : handleDrop}
+      className="rounded-lg transition-all duration-150 text-center select-none cursor-pointer"
       style={{
-        border: `2px dashed ${dragging ? "var(--accent)" : "var(--border)"}`,
-        borderRadius: "var(--radius)",
+        border: `1.5px dashed ${dragging ? "var(--accent)" : "var(--border)"}`,
         padding: "3rem 2rem",
-        textAlign: "center",
-        cursor: "pointer",
-        background: dragging ? "#1a0a0a" : "var(--bg-card)",
-        transition: "border-color 0.15s, background 0.15s",
-        userSelect: "none",
+        background: dragging ? "#150a0a" : "var(--bg-card)",
       }}
     >
-      <div style={{ fontSize: "2rem", marginBottom: "0.75rem" }}>📂</div>
-      <div style={{ fontWeight: 600, marginBottom: "0.25rem" }}>
+      <div
+        className="flex justify-center mb-3 transition-colors duration-150"
+        style={{ color: dragging ? "var(--accent)" : "var(--text-muted)" }}
+      >
+        <CloudUpload size={28} strokeWidth={1.5} />
+      </div>
+      <div className="font-semibold text-sm mb-1" style={{ color: "var(--text)" }}>
         {label ?? (multiple ? "Select files" : "Select file")}
       </div>
-      <div style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>
+      <div className="text-xs" style={{ color: "var(--text-muted)" }}>
         {isTauri ? "Click to browse" : "Click or drag & drop"}
-        {accept && ` · ${accept}`}
+        {accept && <span className="ml-1 opacity-60">{accept}</span>}
       </div>
     </div>
   );

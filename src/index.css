@@ -3,14 +3,11 @@
 :root {
   --bg: #0a0a0a;
   --bg-card: #111111;
-  --bg-input: #0f0f0f;
-  --border: #222222;
-  --border-hover: #333333;
+  --border: #1e1e1e;
   --text: #e2e8f0;
-  --text-muted: #64748b;
+  --text-muted: #52525b;
   --accent: #ef4444;
   --accent-hover: #dc2626;
-  --radius: 8px;
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 

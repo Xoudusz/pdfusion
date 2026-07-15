@@ -1,3 +1,5 @@
+import { Download, Loader2 } from "lucide-react";
+
 interface Props {
   onClick: () => void;
   loading?: boolean;
@@ -6,31 +8,34 @@ interface Props {
 }
 
 export default function DownloadButton({ onClick, loading, label, disabled }: Props) {
+  const inactive = disabled || loading;
   return (
     <button
       onClick={onClick}
-      disabled={disabled || loading}
+      disabled={inactive}
+      className="inline-flex items-center gap-2 rounded-md font-semibold text-sm transition-colors duration-150"
       style={{
-        background: disabled || loading ? "#333" : "var(--accent)",
-        color: "#fff",
+        background: inactive ? "#1e1e1e" : "var(--accent)",
+        color: inactive ? "var(--text-muted)" : "#fff",
         border: "none",
-        borderRadius: "var(--radius)",
-        padding: "0.7rem 1.5rem",
-        fontWeight: 600,
-        fontSize: "0.9rem",
-        cursor: disabled || loading ? "not-allowed" : "pointer",
-        transition: "background 0.15s",
+        padding: "0.65rem 1.4rem",
+        cursor: inactive ? "not-allowed" : "pointer",
         minWidth: 140,
       }}
       onMouseEnter={(e) => {
-        if (!disabled && !loading)
+        if (!inactive)
           (e.currentTarget as HTMLButtonElement).style.background = "var(--accent-hover)";
       }}
       onMouseLeave={(e) => {
-        if (!disabled && !loading)
+        if (!inactive)
           (e.currentTarget as HTMLButtonElement).style.background = "var(--accent)";
       }}
     >
+      {loading ? (
+        <Loader2 size={15} className="animate-spin" />
+      ) : (
+        <Download size={15} />
+      )}
       {loading ? "Processing…" : (label ?? "Download")}
     </button>
   );
