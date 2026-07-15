@@ -43,19 +43,30 @@ interface Props {
 export default function ToolGrid({ onSelect }: Props) {
   return (
     <div>
-      <div className="mb-8 md:mb-10">
+      <div style={{ marginBottom: "2.5rem" }}>
         <h1
-          className="text-2xl md:text-3xl font-bold mb-1.5 tracking-tight"
-          style={{ color: "var(--text)" }}
+          style={{
+            fontSize: "clamp(1.5rem, 5vw, 1.875rem)",
+            fontWeight: 700,
+            letterSpacing: "-0.02em",
+            color: "var(--text)",
+            marginBottom: "0.5rem",
+          }}
         >
           Your PDF toolkit
         </h1>
-        <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+        <p style={{ color: "var(--text-muted)", fontSize: "0.875rem" }}>
           All processing happens in your browser — files never leave your device.
         </p>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))",
+          gap: "0.75rem",
+        }}
+      >
         {TOOLS.map((tool) => {
           const Icon = tool.icon;
           return (
@@ -63,14 +74,19 @@ export default function ToolGrid({ onSelect }: Props) {
               key={tool.id}
               onClick={() => !tool.disabled && onSelect(tool.id)}
               disabled={tool.disabled}
-              className="flex flex-col items-center text-center rounded-xl transition-all duration-150"
               style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                textAlign: "center",
                 background: "var(--bg-card)",
                 border: "1px solid var(--border)",
+                borderRadius: 12,
                 padding: "1.5rem 1rem",
                 cursor: tool.disabled ? "not-allowed" : "pointer",
                 color: "var(--text)",
                 opacity: tool.disabled ? 0.4 : 1,
+                transition: "border-color 0.15s, background 0.15s",
               }}
               onMouseEnter={(e) => {
                 if (tool.disabled) return;
@@ -86,22 +102,29 @@ export default function ToolGrid({ onSelect }: Props) {
               }}
             >
               <div
-                className="flex items-center justify-center rounded-xl mb-3.5"
                 style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
                   width: 52,
                   height: 52,
+                  borderRadius: 12,
                   background: "rgba(239,68,68,0.1)",
                   color: "var(--accent)",
+                  marginBottom: "0.875rem",
+                  flexShrink: 0,
                 }}
               >
                 <Icon size={24} strokeWidth={1.75} />
               </div>
-              <div className="font-semibold text-sm mb-1 leading-tight">{tool.label}</div>
-              <div className="text-xs leading-snug" style={{ color: "var(--text-muted)" }}>
+              <div style={{ fontWeight: 600, fontSize: "0.875rem", marginBottom: "0.375rem", lineHeight: 1.3 }}>
+                {tool.label}
+              </div>
+              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", lineHeight: 1.4 }}>
                 {tool.description}
               </div>
               {tool.disabled && (
-                <div className="text-xs mt-2 font-medium" style={{ color: "var(--accent)" }}>
+                <div style={{ fontSize: "0.7rem", marginTop: "0.5rem", fontWeight: 600, color: "var(--accent)" }}>
                   Coming soon
                 </div>
               )}

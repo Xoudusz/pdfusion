@@ -8,26 +8,39 @@ interface LayoutProps {
 
 export default function Layout({ children, onBack, title }: LayoutProps) {
   return (
-    <div className="min-h-screen flex flex-col">
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
       <header
-        className="sticky top-0 z-10 border-b backdrop-blur-sm"
+        className="sticky top-0 z-10 backdrop-blur-sm"
         style={{
-          borderColor: "var(--border)",
+          borderBottom: "1px solid var(--border)",
           backgroundColor: "rgba(10,10,10,0.85)",
           height: 56,
         }}
       >
-        <div className="flex items-center gap-2 h-full px-4 md:px-6 max-w-5xl mx-auto">
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5rem",
+            height: "100%",
+            padding: "0 1rem",
+            maxWidth: "64rem",
+            marginInline: "auto",
+          }}
+        >
           {onBack && (
             <button
               onClick={onBack}
-              className="flex items-center justify-center rounded-md transition-colors"
               style={{
-                color: "var(--text-muted)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
                 padding: "0.25rem",
                 background: "none",
                 border: "none",
                 cursor: "pointer",
+                color: "var(--text-muted)",
+                borderRadius: 6,
               }}
               onMouseEnter={(e) => {
                 (e.currentTarget as HTMLButtonElement).style.color = "var(--text)";
@@ -40,8 +53,10 @@ export default function Layout({ children, onBack, title }: LayoutProps) {
             </button>
           )}
           <span
-            className="font-bold text-sm tracking-tight"
             style={{
+              fontWeight: 700,
+              fontSize: "0.875rem",
+              letterSpacing: "-0.02em",
               background: "linear-gradient(135deg, #ef4444, #f87171)",
               WebkitBackgroundClip: "text",
               WebkitTextFillColor: "transparent",
@@ -52,7 +67,15 @@ export default function Layout({ children, onBack, title }: LayoutProps) {
           </span>
         </div>
       </header>
-      <main className="flex-1 px-4 md:px-6 py-8 md:py-10 max-w-5xl mx-auto w-full">
+      <main
+        style={{
+          flex: 1,
+          padding: "2rem 1rem",
+          maxWidth: "64rem",
+          marginInline: "auto",
+          width: "100%",
+        }}
+      >
         {children}
       </main>
     </div>
