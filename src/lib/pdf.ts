@@ -4,11 +4,8 @@ let workerInitialized = false;
 
 export function initPdfWorker() {
   if (workerInitialized) return;
-  // Use new URL() for Vite + Tauri WebView compatibility
-  pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-    "pdfjs-dist/build/pdf.worker.mjs",
-    import.meta.url
-  ).href;
+  // Static asset in /public — avoids dynamic import issues in nginx/Tauri
+  pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
   workerInitialized = true;
 }
 
